@@ -449,3 +449,149 @@ The user validated the basic functionality and the `Latest` feed. Now the `Popul
 - [ ] Em andamento
 - [x] Concluida
 - [ ] Bloqueada
+
+---
+
+# Task
+
+## Identificacao
+
+- ID: TASK-010
+- Nome: Implement title search using WordPress search endpoint
+- Fase: Implementation
+- Agente responsavel: Executor
+
+---
+
+## Objetivo
+
+Allow users to search works by name in the Mihon search bar. The search must query the site's native WordPress search endpoint (`?s=query`) and return matching works with title, URL, and thumbnail.
+
+---
+
+## Contexto
+
+Title search was originally excluded from the MVP scope (`non_goals.md`). The user has now explicitly requested it as the next feature after validating Latest and Popular feeds. The site uses a standard WordPress search at `https://thehentaicomics.com/?s=<query>` which returns an HTML results page with the same `.video-conteudo .thumb-conteudo` structure used in tag pages.
+
+The decision to enable title search was registered in `decision_log.md` on 2026-05-09.
+
+---
+
+## Entradas
+
+- Site search endpoint: `https://thehentaicomics.com/?s=<query>`
+- Existing `PopularResolver.kt` HTML parsing patterns (`.video-conteudo .thumb-conteudo a`)
+- Existing `TougTheHentaiComics.kt` (currently returns empty `MangasPage` for search)
+- `docs/architecture.md`
+- `docs/decision_log.md`
+
+---
+
+## Escopo
+
+- Implement `searchMangaRequest(page, query, filters)` to build a GET request to `$baseUrl/?s=<query>&paged=<page>`.
+- Implement `searchMangaParse(response)` to parse the search results HTML page.
+- Extract works using the same Jsoup selectors and ADS filtering logic already used in `PopularResolver`.
+- Support pagination if the site provides a "next page" link on search results.
+- Filter out ADS entries (elements containing `.selo` with "ADS" text, `.thumb-ads`, external domain links).
+- Increment `extVersionCode`.
+- Run Gradle build validation.
+
+---
+
+## Fora de escopo (CRITICO)
+
+- Do not implement advanced filters (tags, categories, date ranges).
+- Do not implement autocomplete or search suggestions.
+- Do not cache search results locally.
+- Do not modify Latest or Popular behavior.
+
+---
+
+## Saidas esperadas
+
+- Mihon's search bar returns matching works when a user types a title query.
+- Results display title, URL, and thumbnail correctly.
+- ADS entries are excluded from results.
+- Pagination works if the site provides multiple result pages.
+
+---
+
+## Criterios de aceite
+
+- `searchMangaRequest` builds a valid URL with the user query URL-encoded.
+- `searchMangaParse` returns a `MangasPage` with correct entries.
+- ADS filtering is active on search results (same rules as Popular).
+- Empty queries return empty results gracefully.
+- Build passes without errors: `.\\gradlew.bat --no-daemon :src:pt:thehentaicomics:assembleDebug`.
+
+---
+
+## Dependencias
+
+- TASK-009 completed and validated.
+- Decision "Enable Title Search" registered in `decision_log.md`.
+
+---
+
+## Restricoes
+
+- Follow `docs/architecture.md`.
+- Reuse existing HTTP client (`fetchBody`) and ADS filtering logic.
+- Keep behavior request-scoped (no persistent cache).
+- Preserve compatibility with Mihon extension loading.
+- Do not break existing Latest or Popular feeds.
+
+---
+
+## Impacto no sistema
+
+- Modifies `TougTheHentaiComics.kt` to implement real search request/parse methods.
+- May introduce a `SearchResolver.kt` or inline the logic if simple enough.
+- Adds new network requests to the WordPress search endpoint.
+
+---
+
+## Estrategia de implementacao
+
+- Build the search URL using `$baseUrl/?s=<encoded_query>&paged=<page>`.
+- In `searchMangaParse`, load the response HTML body with Jsoup.
+- Select work entries using `.video-conteudo .thumb-conteudo a` (same as Popular/tag pages).
+- Apply ADS filtering (skip entries with `.selo` "ADS", `.thumb-ads`, external links).
+- Extract title from `a` title attribute or inner text, URL from `a` href, thumbnail from `img` src.
+- Detect "next page" via pagination links to set `hasNextPage`.
+- If no results match, return `MangasPage(emptyList(), false)`.
+
+---
+
+## Plano de validacao
+
+- Run Gradle build.
+- Handoff the APK to the user for manual testing on mobile device.
+- User searches for a known title (e.g., "Dragon Ball") and verifies results.
+- User searches for a non-existent title and verifies empty results.
+
+---
+
+## Artefatos a atualizar
+
+- `src/pt/thehentaicomics/src/eu/kanade/tachiyomi/extension/pt/thehentaicomics/TougTheHentaiComics.kt`
+- `src/pt/thehentaicomics/build.gradle`
+- `docs/handoff.md`
+- `docs/project_status.md`
+
+---
+
+## Observacoes
+
+- The site uses Cloudflare, which may occasionally return 520 errors. The extension should handle these gracefully (return empty results, not crash).
+- WordPress search supports pagination via `?paged=2`, `?paged=3`, etc.
+
+---
+
+## Status
+
+- [ ] Nao iniciada
+- [ ] Em andamento
+- [x] Concluida
+- [ ] Bloqueada

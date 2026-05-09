@@ -1,7 +1,7 @@
 ext {
     extName = 'Toug - The Hentai Comics'
     extClass = '.TougTheHentaiComics'
-    extVersionCode = 6
+    extVersionCode = 7
     apkNamePrefix = 'mihon'
     isNsfw = true
 }

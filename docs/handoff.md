@@ -2,42 +2,46 @@
 
 ## Task
 
-- ID: TASK-009
-- Nome: Implement Popular tab using post_tag-sitemap.xml
+- ID: TASK-010
+- Nome: Implement title search using WordPress search endpoint
 - Agente responsavel: Executor
 
 ---
 
 ## Objetivo da Task
 
-Populate the "Popular" tab in Mihon by fetching the most recently updated tags from `post_tag-sitemap.xml` and parsing the works inside them.
+Enable users to search works by name in Mihon's search bar using the site's native WordPress search endpoint (`?s=query`).
 
 ---
 
 ## Escopo executado
 
 Implemented:
-- Created `PopularResolver.kt` to parse `post_tag-sitemap.xml` and extract tag URLs.
-- The `PopularResolver` downloads the corresponding tag HTML page based on Mihon's requested page.
-- Jsoup is used to extract the Manga entries correctly from the `.video-conteudo .thumb-conteudo a` selector.
-- `TougTheHentaiComics.kt` was modified to intercept `popularMangaRequest` and request the tag sitemap, and `popularMangaParse` uses `PopularResolver` to parse the subsequent response.
-- `extVersionCode` was incremented to 4 in `build.gradle`.
+- Created `SearchResolver.kt` to parse WordPress search result pages.
+- Jsoup extracts entries using `.video-conteudo .thumb-conteudo a` (same selector as Popular).
+- ADS filtering applied: entries with `.selo`/`.thumb-ads` "ADS" text or external domain links are excluded.
+- Pagination detection via `.next` link selectors.
+- `TougTheHentaiComics.kt` modified: `searchMangaRequest` builds `$baseUrl/?s=<query>&paged=<page>`, `searchMangaParse` delegates to `SearchResolver`.
+- Empty/blank queries return empty results gracefully.
+- `extVersionCode` incremented to 7.
 
 ---
 
 ## Artefatos afetados
 
+New:
+- `src/pt/thehentaicomics/src/eu/kanade/tachiyomi/extension/pt/thehentaicomics/SearchResolver.kt`
+
 Modified:
 - `src/pt/thehentaicomics/src/eu/kanade/tachiyomi/extension/pt/thehentaicomics/TougTheHentaiComics.kt`
 - `src/pt/thehentaicomics/build.gradle`
 - `docs/tasks.md`
+- `docs/decision_log.md`
+- `docs/non_goals.md`
 - `docs/project_status.md`
 
-New:
-- `src/pt/thehentaicomics/src/eu/kanade/tachiyomi/extension/pt/thehentaicomics/PopularResolver.kt`
-
 Build output:
-- `src/pt/thehentaicomics/build/outputs/apk/debug/mihon-pt.thehentaicomics-v1.4.4-debug.apk`
+- `src/pt/thehentaicomics/build/outputs/apk/debug/mihon-pt.thehentaicomics-v1.4.7-debug.apk`
 
 ---
 
@@ -45,19 +49,29 @@ Build output:
 
 Build output:
 ```text
-BUILD SUCCESSFUL in 1m 34s
+BUILD SUCCESSFUL in 1m 43s
+81 actionable tasks: 19 executed, 62 up-to-date
 ```
 
-`TougTheHentaiComics.kt` integration:
+`TougTheHentaiComics.kt` search integration:
 ```kotlin
-    override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/post_tag-sitemap.xml?page=$page", headers)
+    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
+        if (query.isBlank()) return GET(baseUrl, headers)
+        val url = baseUrl.toHttpUrl().newBuilder()
+            .addQueryParameter("s", query)
+            .addQueryParameter("paged", page.toString())
+            .build()
+        return GET(url, headers)
+    }
 
-    override fun popularMangaParse(response: Response): MangasPage {
+    override fun searchMangaParse(response: Response): MangasPage {
         response.use {
-            return popularResolver.resolveFromTagSitemap(
-                sitemapXml = it.body.string(),
-                page = it.request.url.queryParameter("page")?.toIntOrNull() ?: 1,
-                fetchHtml = ::fetchBody,
+            if (it.request.url.queryParameter("s").isNullOrBlank()) {
+                return MangasPage(emptyList(), false)
+            }
+            return searchResolver.parseSearchResults(
+                html = it.body.string(),
+                requestUrl = it.request.url.toString(),
             )
         }
     }
@@ -67,14 +81,15 @@ BUILD SUCCESSFUL in 1m 34s
 
 ## Logica implementada
 
-When Mihon asks for a Popular page:
-1. `popularMangaRequest` asks for `post_tag-sitemap.xml`.
-2. Mihon executes the request and passes the XML to `popularMangaParse`.
-3. `PopularResolver` parses the tags, sorts them by `lastmod` descending.
-4. It picks the tag URL at index `page - 1`.
-5. It performs a blocking network fetch for the specific tag page HTML.
-6. It parses the tag page with Jsoup to extract works.
-7. It returns `MangasPage` with `hasNextPage = true` if there are more tags available.
+When Mihon triggers a search:
+1. `searchMangaRequest` builds a URL with `?s=<query>&paged=<page>`.
+2. Mihon executes the HTTP request and passes the HTML response to `searchMangaParse`.
+3. `SearchResolver.parseSearchResults` parses the HTML with Jsoup.
+4. It selects entries using `.video-conteudo .thumb-conteudo a`.
+5. ADS filtering removes entries with `.selo`/`.thumb-ads` "ADS" text or external domain links.
+6. It extracts title (from `a` title attr or `img` alt), URL (from `a` href), and thumbnail (from `img` src).
+7. Pagination is detected via `.next` link presence.
+8. Returns `MangasPage` with results and `hasNextPage` flag.
 
 ---
 
@@ -89,20 +104,24 @@ The build completed successfully with Exit code 0.
 
 ## Limitacoes conhecidas
 
-- Each scroll in Mihon's `Popular` tab fetches the `post_tag-sitemap.xml` again because it is a stateless architecture within the parsing block, and caching is outside the scope of MVP. However, Cloudflare usually caches sitemaps efficiently.
-- Tag pages with no valid items will return empty `MangasPage` elements, which Mihon might interpret as the end of the list depending on its internal handling.
+- The site uses Cloudflare which may occasionally return 520 errors; the extension will show empty results in that case rather than crashing.
+- WordPress search relevance is controlled by the site, not the extension.
 
 ---
 
 ## Pendencias
 
-- Manual Mihon retest of the Popular feed.
+- Manual Mihon retest of the search functionality on Android device.
 
 ---
 
 ## Proxima acao sugerida
 
-- User should install `mihon-pt.thehentaicomics-v1.4.4-debug.apk` and report `Popular` tab behavior.
+- User should install `mihon-pt.thehentaicomics-v1.4.7-debug.apk` and test:
+  1. Search for a known title (e.g., "Dragon Ball").
+  2. Verify results display correctly with titles, thumbnails, and no ADS.
+  3. Search for a non-existent title and verify empty results.
+  4. Test pagination if enough results exist.
 
 ---
 

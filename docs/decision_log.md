@@ -143,3 +143,19 @@ Decision: The `Popular` tab will be populated using the site's `post_tag-sitemap
 Reason: The site does not have a native "Popular" feed. However, it exposes a tag sitemap with `lastmod` dates. We will use the most recently updated tags as a proxy for popular content, where each Mihon page request corresponds to one tag page from the sitemap (ordered by last updated).
 
 Impact: Adds a new `PopularResolver` and enables the previously empty "Popular" tab.
+
+## 2026-05-09 - TASK-009 Validation Result
+
+Decision: TASK-009 was approved.
+
+Reason: The user validated the Popular tab on Android. The feed loaded correctly, ADS elements were filtered out, and pagination worked. Additional post-task fixes included ADS filtering, custom icon injection (extVersionCode incremented to 6), and README creation.
+
+Impact: The extension is now feature-complete for Latest and Popular. The user requested title search as the next feature.
+
+## 2026-05-09 - Enable Title Search
+
+Decision: Title search will be implemented using the site's native WordPress search endpoint (`?s=query`).
+
+Reason: The user explicitly requested the ability to search works by name. This expands the project beyond the original MVP non-goal that excluded title search.
+
+Impact: Removes "Title search" from `non_goals.md`. Adds TASK-010 to implement search. Requires a new `SearchResolver` component and modifications to `TougTheHentaiComics.kt`.

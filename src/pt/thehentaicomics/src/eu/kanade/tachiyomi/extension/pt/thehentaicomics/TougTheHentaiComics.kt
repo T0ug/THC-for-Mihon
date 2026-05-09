@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import okhttp3.Response
 
@@ -22,6 +23,7 @@ class TougTheHentaiComics : HttpSource() {
 
     private val latestResolver = LatestResolver(baseUrl)
     private val popularResolver = PopularResolver(baseUrl)
+    private val searchResolver = SearchResolver(baseUrl)
     private val contentPageParser = ContentPageParser(baseUrl)
     private val imageExtractor = ImageExtractor(baseUrl)
 
@@ -50,9 +52,26 @@ class TougTheHentaiComics : HttpSource() {
         }
     }
 
-    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request = GET(baseUrl, headers)
+    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
+        if (query.isBlank()) return GET(baseUrl, headers)
+        val url = baseUrl.toHttpUrl().newBuilder()
+            .addQueryParameter("s", query)
+            .addQueryParameter("paged", page.toString())
+            .build()
+        return GET(url, headers)
+    }
 
-    override fun searchMangaParse(response: Response): MangasPage = MangasPage(emptyList(), false)
+    override fun searchMangaParse(response: Response): MangasPage {
+        response.use {
+            if (it.request.url.queryParameter("s").isNullOrBlank()) {
+                return MangasPage(emptyList(), false)
+            }
+            return searchResolver.parseSearchResults(
+                html = it.body.string(),
+                requestUrl = it.request.url.toString(),
+            )
+        }
+    }
 
     override fun mangaDetailsParse(response: Response): SManga {
         response.use {
