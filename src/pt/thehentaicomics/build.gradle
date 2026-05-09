@@ -1,0 +1,9 @@
+ext {
+    extName = 'Toug - The Hentai Comics'
+    extClass = '.TougTheHentaiComics'
+    extVersionCode = 6
+    apkNamePrefix = 'mihon'
+    isNsfw = true
+}
+
+apply from: "$rootDir/common.gradle"
