@@ -2,126 +2,107 @@
 
 ## Task
 
-- ID: TASK-010
-- Nome: Implement title search using WordPress search endpoint
+- ID: TASK-011
+- Nome: Enable remote installation via GitHub repository
 - Agente responsavel: Executor
 
 ---
 
 ## Objetivo da Task
 
-Enable users to search works by name in Mihon's search bar using the site's native WordPress search endpoint (`?s=query`).
+Make the extension installable from Mihon by adding the GitHub repository URL in Mihon's extension settings. The Mihon app reads `index.min.json` from the repo to discover available extensions and downloads the APK directly.
 
 ---
 
 ## Escopo executado
 
 Implemented:
-- Created `SearchResolver.kt` to parse WordPress search result pages.
-- Jsoup extracts entries using `.video-conteudo .thumb-conteudo a` (same selector as Popular).
-- ADS filtering applied: entries with `.selo`/`.thumb-ads` "ADS" text or external domain links are excluded.
-- Pagination detection via `.next` link selectors.
-- `TougTheHentaiComics.kt` modified: `searchMangaRequest` builds `$baseUrl/?s=<query>&paged=<page>`, `searchMangaParse` delegates to `SearchResolver`.
-- Empty/blank queries return empty results gracefully.
-- `extVersionCode` incremented to 7.
+- Created `repo/index.min.json` with extension metadata matching the Mihon repository schema.
+- Source ID calculated via MurmurHash3 (`-7329981312210241844`) matching the APK's internal ID.
+- Copied the APK `mihon-pt.thehentaicomics-v1.4.7.apk` to `repo/`.
+- Removed `repo/` from `.gitignore` so it is tracked by git.
+- Added `index.min_example/` to `.gitignore`.
+- Resolved git history divergence (remote had different initial commit) via force push.
+- All changes pushed to `https://github.com/T0ug/THC-for-Mihon`.
 
 ---
 
 ## Artefatos afetados
 
 New:
-- `src/pt/thehentaicomics/src/eu/kanade/tachiyomi/extension/pt/thehentaicomics/SearchResolver.kt`
+- `repo/index.min.json`
+- `repo/mihon-pt.thehentaicomics-v1.4.7.apk`
 
 Modified:
-- `src/pt/thehentaicomics/src/eu/kanade/tachiyomi/extension/pt/thehentaicomics/TougTheHentaiComics.kt`
-- `src/pt/thehentaicomics/build.gradle`
-- `docs/tasks.md`
-- `docs/decision_log.md`
-- `docs/non_goals.md`
+- `.gitignore`
 - `docs/project_status.md`
-
-Build output:
-- `src/pt/thehentaicomics/build/outputs/apk/debug/mihon-pt.thehentaicomics-v1.4.7-debug.apk`
+- `docs/handoff.md`
 
 ---
 
 ## Evidencia da entrega
 
-Build output:
-```text
-BUILD SUCCESSFUL in 1m 43s
-81 actionable tasks: 19 executed, 62 up-to-date
+Remote `index.min.json` accessible at:
+```
+https://raw.githubusercontent.com/T0ug/THC-for-Mihon/main/repo/index.min.json
 ```
 
-`TougTheHentaiComics.kt` search integration:
-```kotlin
-    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
-        if (query.isBlank()) return GET(baseUrl, headers)
-        val url = baseUrl.toHttpUrl().newBuilder()
-            .addQueryParameter("s", query)
-            .addQueryParameter("paged", page.toString())
-            .build()
-        return GET(url, headers)
-    }
+Contents:
+```json
+[{"name":"Tachiyomi: Toug - The Hentai Comics","pkg":"eu.kanade.tachiyomi.extension.pt.thehentaicomics","apk":"mihon-pt.thehentaicomics-v1.4.7.apk","lang":"pt-BR","code":7,"version":"1.4.7","nsfw":1,"hasReadme":0,"hasChangelog":0,"sources":[{"name":"Toug - The Hentai Comics","lang":"pt-BR","id":"-7329981312210241844","baseUrl":"https://thehentaicomics.com"}]}]
+```
 
-    override fun searchMangaParse(response: Response): MangasPage {
-        response.use {
-            if (it.request.url.queryParameter("s").isNullOrBlank()) {
-                return MangasPage(emptyList(), false)
-            }
-            return searchResolver.parseSearchResults(
-                html = it.body.string(),
-                requestUrl = it.request.url.toString(),
-            )
-        }
-    }
+Git push output:
+```
+To https://github.com/T0ug/THC-for-Mihon.git
+ + a42a049...5fd29e3 main -> main (forced update)
 ```
 
 ---
 
 ## Logica implementada
 
-When Mihon triggers a search:
-1. `searchMangaRequest` builds a URL with `?s=<query>&paged=<page>`.
-2. Mihon executes the HTTP request and passes the HTML response to `searchMangaParse`.
-3. `SearchResolver.parseSearchResults` parses the HTML with Jsoup.
-4. It selects entries using `.video-conteudo .thumb-conteudo a`.
-5. ADS filtering removes entries with `.selo`/`.thumb-ads` "ADS" text or external domain links.
-6. It extracts title (from `a` title attr or `img` alt), URL (from `a` href), and thumbnail (from `img` src).
-7. Pagination is detected via `.next` link presence.
-8. Returns `MangasPage` with results and `hasNextPage` flag.
+When a user adds the repository URL in Mihon:
+1. Mihon fetches `<repo_url>/index.min.json`.
+2. It reads the extension metadata (name, package, APK filename, version, sources).
+3. The extension appears in Mihon's extension list under the "pt-BR" language filter.
+4. When the user taps "Install", Mihon downloads `<repo_url>/<apk>` and installs it.
+
+Repository URL to add in Mihon:
+```
+https://raw.githubusercontent.com/T0ug/THC-for-Mihon/main/repo
+```
 
 ---
 
 ## Validacao realizada
 
-Commands executed:
-- `.\gradlew.bat --no-daemon :src:pt:thehentaicomics:assembleDebug`
-
-The build completed successfully with Exit code 0.
+- Verified `repo/index.min.json` is accessible via `raw.githubusercontent.com`.
+- Verified JSON format matches the Keiyoushi/Mihon extension repository schema.
+- Verified APK file exists in `repo/`.
 
 ---
 
 ## Limitacoes conhecidas
 
-- The site uses Cloudflare which may occasionally return 520 errors; the extension will show empty results in that case rather than crashing.
-- WordPress search relevance is controlled by the site, not the extension.
+- The source ID was calculated using MurmurHash3 on `"$baseUrl/$lang/$name"`. If the extension's `name`, `lang`, or `baseUrl` change, the ID must be recalculated and `index.min.json` updated.
+- The `repo/` directory contains the APK directly in git; for large-scale repositories, GitHub Releases or LFS would be more appropriate.
 
 ---
 
 ## Pendencias
 
-- Manual Mihon retest of the search functionality on Android device.
+- Manual Mihon test: add the repository URL and verify the extension appears and installs correctly.
 
 ---
 
 ## Proxima acao sugerida
 
-- User should install `mihon-pt.thehentaicomics-v1.4.7-debug.apk` and test:
-  1. Search for a known title (e.g., "Dragon Ball").
-  2. Verify results display correctly with titles, thumbnails, and no ADS.
-  3. Search for a non-existent title and verify empty results.
-  4. Test pagination if enough results exist.
+1. Open Mihon → Settings → Browse → Extension repos.
+2. Add: `https://raw.githubusercontent.com/T0ug/THC-for-Mihon/main/repo`
+3. Go to Browse → Extensions tab.
+4. Verify "Toug - The Hentai Comics" appears under "pt-BR".
+5. Tap Install and verify the extension works.
 
 ---
 

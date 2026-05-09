@@ -595,3 +595,70 @@ The decision to enable title search was registered in `decision_log.md` on 2026-
 - [ ] Em andamento
 - [x] Concluida
 - [ ] Bloqueada
+
+---
+
+# Task
+
+## Identificacao
+
+- ID: TASK-011
+- Nome: Enable remote installation via GitHub repository
+- Fase: Deployment
+- Agente responsavel: Executor
+
+---
+
+## Objetivo
+
+Make the extension installable directly from Mihon by adding the GitHub repository URL in Mihon's extension settings. This requires creating a `repo/index.min.json` manifest and hosting the APK alongside it.
+
+---
+
+## Contexto
+
+The user requested the ability to install the extension via a repository link in Mihon's settings screen. The Mihon app supports third-party extension repositories by reading an `index.min.json` file from a URL. An example `index.min.json` was provided in `index.min_example/`.
+
+---
+
+## Escopo
+
+- Create `repo/index.min.json` following the Mihon extension repository schema.
+- Calculate the correct source ID using MurmurHash3 hash of `"$baseUrl/$lang/$name"`.
+- Copy the built APK to `repo/`.
+- Remove `repo/` from `.gitignore` so it is version-controlled.
+- Push all changes to `https://github.com/T0ug/THC-for-Mihon`.
+
+---
+
+## Fora de escopo (CRITICO)
+
+- Do not implement CI/CD for automatic APK building.
+- Do not implement GitHub Releases or LFS.
+- Do not sign the APK for production distribution.
+
+---
+
+## Saidas esperadas
+
+- `repo/index.min.json` accessible at `https://raw.githubusercontent.com/T0ug/THC-for-Mihon/main/repo/index.min.json`.
+- APK downloadable from the same base URL.
+- Extension appears in Mihon when the repository URL is added.
+
+---
+
+## Criterios de aceite
+
+- `index.min.json` matches the Mihon repository schema.
+- Source ID matches the APK's internal ID.
+- Repository URL is functional on `raw.githubusercontent.com`.
+- All changes are pushed to the remote repository.
+
+---
+
+## Status
+
+- [ ] Nao iniciada
+- [ ] Em andamento
+- [x] Concluida
+- [ ] Bloqueada
